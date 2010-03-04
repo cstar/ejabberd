@@ -1,0 +1,3 @@
+src/*.beam
+src/**/Makefile
+src/*.so
