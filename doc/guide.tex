@@ -92,6 +92,7 @@
 \newcommand{\modrosterodbc}{\module{mod\_roster\_odbc}}
 \newcommand{\modservicelog}{\module{mod\_service\_log}}
 \newcommand{\modsharedroster}{\module{mod\_shared\_roster}}
+\newcommand{\modsic}{\module{mod\_sic}}
 \newcommand{\modstats}{\module{mod\_stats}}
 \newcommand{\modtime}{\module{mod\_time}}
 \newcommand{\modvcard}{\module{mod\_vcard}}
@@ -2238,7 +2239,22 @@ You can authenticate users against an LDAP directory. Available options are:
   not forget to close brackets and do not use superfluous whitespaces. Also you
   \emph{must not} use \option{ldap\_uidattr} attribute in filter because this
   attribute will be substituted in LDAP filter automatically.
-
+  \titem{\{ldap\_dn\_filter, \{ Filter, FilterAttrs \}\}}\ind{options!ldap\_dn\_filter}
+  This filter is applied on the results returned by the main filter. This filter
+  performs additional LDAP lookup to make the complete result. This is useful
+  when you are unable to define all filter rules in \term{ldap\_filter}. You
+  can define \term{"\%u"}, \term{"\%d"}, \term{"\%s"} and \term{"\%D"} pattern
+  variables in Filter: \term{"\%u"} is replaced by a user's part of a JID,
+  \term{"\%d"} is replaced by the corresponding domain (virtual host),
+  all \term{"\%s"} variables are consecutively replaced by values of FilterAttrs
+  attributes and \term{"\%D"} is replaced by Distinguished Name. By default
+  \term{ldap\_dn\_filter} is undefined.
+  Example:
+\begin{verbatim}
+{ldap_dn_filter, {"(&(name=%s)(owner=%D)(user=%u@%d))", ["sn"]}}.
+\end{verbatim}
+  Since this filter makes additional LDAP lookups, use it only in the
+  last resort: try to define all filter rules in \term{ldap\_filter} if possible.
   \titem{\{ldap\_local\_filter, Filter\}}\ind{options!ldap\_local\_filter}
   If you can't use \term{ldap\_filter} due to performance reasons
   (the LDAP server has many users registered),
@@ -2465,6 +2481,7 @@ The following table lists all modules included in \ejabberd{}.
     \hline \ahrefloc{modservicelog}{\modservicelog{}} & Copy user messages to logger service &  \\
     \hline \ahrefloc{modsharedroster}{\modsharedroster{}} & Shared roster management & \modroster{} or \\
     & & \modrosterodbc\\
+    \hline \ahrefloc{modsic}{\modsic{}} & Server IP Check (\xepref{0279}) &  \\
     \hline \ahrefloc{modstats}{\modstats{}} & Statistics Gathering (\xepref{0039}) &  \\
     \hline \ahrefloc{modtime}{\modtime{}} & Entity Time (\xepref{0202}) &  \\
     \hline \ahrefloc{modvcard}{\modvcard{}} & vcard-temp (\xepref{0054}) &  \\
@@ -3958,6 +3975,17 @@ Examples:
   \end{tabular}
 \end{table}
 \end{itemize}
+
+\makesubsection{modsic}{\modsic{}}
+\ind{modules!\modstats{}}\ind{protocols!XEP-0279: Server IP Check}
+
+This module adds support for Server IP Check (\xepref{0279}). This protocol
+enables a client to discover its external IP address.
+
+Options:
+\begin{description}
+\iqdiscitem{\ns{urn:xmpp:sic:0}}
+\end{description}
 
 \makesubsection{modstats}{\modstats{}}
 \ind{modules!\modstats{}}\ind{protocols!XEP-0039: Statistics Gathering}\ind{statistics}
