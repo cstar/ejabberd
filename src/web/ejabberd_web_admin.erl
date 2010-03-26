@@ -1599,22 +1599,26 @@ get_offlinemsg_length(ModOffline, User, Server) ->
     end.
 
 get_offlinemsg_module(Server) ->
-    case [mod_offline, mod_offline_odbc] -- gen_mod:loaded_modules(Server) of
-        [mod_offline, mod_offline_odbc] -> none;
-        [mod_offline_odbc] -> mod_offline;
-        [mod_offline] -> mod_offline_odbc
+    case [mod_offline, mod_offline_odbc, mod_offline_s3] -- gen_mod:loaded_modules(Server) of
+        [mod_offline, mod_offline_odbc, mod_offline_s3] -> none;
+        [mod_offline_odbc, mod_offline_s3] -> mod_offline;
+        [mod_offline, mod_offline_s3] -> mod_offline_odbc;
+        [mod_offline, mod_offline_odbc] -> mod_offline_s3
     end.
 
 get_lastactivity_module(Server) ->
-    case lists:member(mod_last, gen_mod:loaded_modules(Server)) of
-        true -> mod_last;
-        _ -> mod_last_odbc
+    case [mod_last, mod_last_odbc, mod_last_sdb] -- gen_mod:loaded_modules(Server) of
+        [mod_last, mod_last_odbc, mod_last_sdb] -> none;
+        [mod_last_odbc, mod_last_sdb] -> mod_last;
+        [mod_last, mod_last_sdb] -> mod_last_odbc;
+        [mod_last, mod_last_odbc] -> mod_last_sdb
     end.
 
 get_lastactivity_menuitem_list(Server) ->
     case get_lastactivity_module(Server) of
         mod_last -> [{"last-activity", "Last Activity"}];
-        mod_last_odbc -> []
+        mod_last_odbc -> [];
+        mod_last_sdb -> []
     end.
 
 us_to_list({User, Server}) ->
