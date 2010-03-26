@@ -424,6 +424,7 @@ process_subscription(Direction, User, Server, JID1, Type, Reason) ->
 			{{push, NewItem}, AutoReply}
 		end
 	end,
+	%% will be removed
     case mnesia:transaction(F) of
 	{atomic, {Push, AutoReply}} ->
 	    case AutoReply of
@@ -868,9 +869,9 @@ webadmin_page(Acc, _, _) -> Acc.
 
 user_roster(User, Server, Query, Lang) ->
     US = {jlib:nodeprep(User), jlib:nameprep(Server)},
-    Items1 = mnesia:dirty_index_read(roster, US, #roster.us),
+    Items1 = sdb_read(US),
     Res = user_roster_parse_query(User, Server, Items1, Query),
-    Items = mnesia:dirty_index_read(roster, US, #roster.us),
+    Items = sdb_read(US),
     SItems = lists:sort(Items),
     FItems =
 	case SItems of
