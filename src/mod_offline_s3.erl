@@ -340,7 +340,7 @@ pop_offline_messages(Ls, User, Server) ->
 		  true ->
         false
     end,
-    %delete_msg(Bucket, Key),
+    delete_msg(Bucket, Key),
     M
   end),
   ?DEBUG("Offline list :~p", [Rs]),
@@ -357,13 +357,14 @@ pop_offline_messages(Ls, User, Server) ->
 %TBD
 remove_expired_messages() ->
     TimeStamp = now(),
+    Bucket = bucket(),
     erls3:get_objects(Bucket, [{prefix, ?S3_ROOT}],fun(_, {Key, Content, _})->
       Rec = binary_to_term(list_to_binary(Content)),
         case Rec#offline_msg.expire of
 			    never -> ok;
 			    TS ->
 				    if
-				      TS < TimeStamp -> delete_msg(Bucket, Key)
+				      TS < TimeStamp -> delete_msg(Bucket, Key);
 				      true -> ok
 				    end
 			  end
@@ -375,12 +376,13 @@ remove_old_messages(Days) ->
     S = MegaSecs * 1000000 + Secs - 60 * 60 * 24 * Days,
     MegaSecs1 = S div 1000000,
     Secs1 = S rem 1000000,
+    Bucket = bucket(),
     TimeStamp = {MegaSecs1, Secs1, 0},
     erls3:get_objects(Bucket, [{prefix, ?S3_ROOT}],fun(_, {Key, Content, _})->
       Rec = binary_to_term(list_to_binary(Content)),
       TS = Rec#offline_msg.timestamp,
 			if
-			  TS < TimeStamp -> delete_msg(Bucket, Key)
+			  TS < TimeStamp -> delete_msg(Bucket, Key);
 			  true -> ok
 			end
     end).
