@@ -179,7 +179,8 @@ get_last_info(LUser, LServer) ->
 	{ok, []} ->
 	    not_found;
 	{ok,Activity} ->
-	    {ok, proplists:get_value("timestamp", Activity), proplists:get_value("status", Activity)}
+	   {Int, _ } = string:to_integer(proplists:get_value("timestamp", Activity)),
+	   {ok, Int, proplists:get_value("status", Activity)}
     end.
 
 remove_user(User, Server) ->
