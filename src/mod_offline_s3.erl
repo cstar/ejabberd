@@ -67,16 +67,20 @@ bucket()->
   Bucket.
 
 write_msg(Bucket, #offline_msg{}=Offline)->
-  ?DEBUG("OFFLINE : Writing message ~p", [Offline]),
   erls3:write_term(Bucket, build_key(Offline), Offline).
 delete_msg(Bucket, Key)->
    erls3:delete_object(Bucket, Key).
-%read_msg(Bucket, Key)->
-%  {ok, {Term, H}} = erls3:read_term(Bucket, Key),
-%  Term.
-%% Fun = fun({Key, Content, Headers})
+   
 foreach_user_msg(Bucket, {User, Host}, Fun)->
   erls3:get_objects(Bucket, [{prefix, build_root(Host, User)}], Fun).
+  
+get_all_msgs(US)->
+  foreach_user_msg(bucket(), US, fun(_B, {_, Content, _})->
+      binary_to_term(list_to_binary(Content))
+    end).
+get_all_keys({User, Host})->
+  {ok, Keys} =  erls3:list_objects(bucket(), [{prefix, build_root(Host, User)}]),
+  lists:map(fun({object_info, {"Key", Key}, _, _, _}) -> Key end,Keys).
 
 start(Host, Opts) ->
     ejabberd_hooks:add(offline_message_hook, Host,
@@ -116,7 +120,7 @@ loop(AccessMaxOfflineMsgs, Bucket) ->
     receive
 	#offline_msg{us=US} = Msg ->
 	    Msgs = receive_all(US, [Msg]),
-	    Len = length(Msgs),
+	    %Len = length(Msgs),
 	    {User, Host} = US,
 	    MaxOfflineMsgs = get_max_user_messages(AccessMaxOfflineMsgs,
 						   User, Host),
@@ -306,7 +310,7 @@ find_x_expire(TimeStamp, [El | Els]) ->
 
 
 pop_offline_messages(Ls, User, Server) ->
-  ?DEBUG("Calling pop_offline_messages for ~p", [User]),
+  %?DEBUG("Calling pop_offline_messages for ~p", [User]),
   LUser = jlib:nodeprep(User),
   LServer = jlib:nameprep(Server),
   US = {LUser, LServer},
@@ -427,12 +431,12 @@ user_queue(User, Server, Query, Lang) ->
     US = {jlib:nodeprep(User), jlib:nameprep(Server)},
     Res = user_queue_parse_query(US, Query),
     Msgs = lists:keysort(#offline_msg.timestamp,
-			 mnesia:dirty_read({offline_msg, US})),
+			get_all_msgs(US)),
     FMsgs =
 	lists:map(
 	  fun(#offline_msg{timestamp = TimeStamp, from = From, to = To,
 			   packet = {xmlelement, Name, Attrs, Els}} = Msg) ->
-		  ID = jlib:encode_base64(binary_to_list(term_to_binary(Msg))),
+		  ID = build_key(Msg),
 		  {{Year, Month, Day}, {Hour, Minute, Second}} =
 		      calendar:now_to_local_time(TimeStamp),
 		  Time = lists:flatten(
@@ -482,26 +486,15 @@ user_queue(User, Server, Query, Lang) ->
 	       ?INPUTT("submit", "delete", "Delete Selected")
 	      ])].
 
-user_queue_parse_query(US, Query) ->
-    case lists:keysearch("delete", 1, Query) of
+user_queue_parse_query(_US, Query) ->
+  case lists:keysearch("delete", 1, Query) of
 	{value, _} ->
-	    Msgs = lists:keysort(#offline_msg.timestamp,
-				 mnesia:dirty_read({offline_msg, US})),
-	    F = fun() ->
 			lists:foreach(
-			  fun(Msg) ->
-				  ID = jlib:encode_base64(
-					 binary_to_list(term_to_binary(Msg))),
-				  case lists:member({"selected", ID}, Query) of
-				      true ->
-					  mnesia:delete_object(Msg);
-				      false ->
-					  ok
-				  end
-			  end, Msgs)
-		end,
-	    mnesia:transaction(F),
-	    ok;
+			  fun({"selected", ID}) ->
+			    delete_msg(bucket(), ID);
+				(_)-> ok
+			  end, Query),
+	  ok;
 	false ->
 	    nothing
     end.
@@ -511,27 +504,19 @@ us_to_list({User, Server}) ->
 
 webadmin_user(Acc, User, Server, Lang) ->
     US = {jlib:nodeprep(User), jlib:nameprep(Server)},
-    QueueLen = length(mnesia:dirty_read({offline_msg, US})),
+    QueueLen = length(get_all_keys(US)),
     FQueueLen = [?AC("queue/",
 		     integer_to_list(QueueLen))],
     Acc ++ [?XCT("h3", "Offline Messages:")] ++ FQueueLen ++ [?C(" "), ?INPUTT("submit", "removealloffline", "Remove All Offline Messages")].
 
 webadmin_user_parse_query(_, "removealloffline", User, Server, _Query) ->
-    US = {User, Server},
-    F = fun() ->
-            mnesia:write_lock_table(offline_msg),
-            lists:foreach(
-              fun(Msg) ->
-                      mnesia:delete_object(Msg)
-              end, mnesia:dirty_read({offline_msg, US}))
-        end,
-    case mnesia:transaction(F) of
-         {aborted, Reason} ->
-            ?ERROR_MSG("Failed to remove offline messages: ~p", [Reason]),
-            {stop, error};
-         {atomic, ok} ->
-            ?INFO_MSG("Removed all offline messages for ~s@~s", [User, Server]),
-            {stop, ok}
-    end;
+  US = {User, Server},
+  lists:foreach(
+    fun(Key) ->
+      delete_msg(bucket(), Key)
+    end, get_all_keys(US)),
+  ?INFO_MSG("Removed all offline messages for ~s@~s", [User, Server]),
+  {stop, ok};
+
 webadmin_user_parse_query(Acc, _Action, _User, _Server, _Query) ->
     Acc.
