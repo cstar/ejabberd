@@ -361,8 +361,6 @@ ask_to_pending(subscribe) -> out;
 ask_to_pending(unsubscribe) -> none;
 ask_to_pending(Ask) -> Ask.
 
-
-
 in_subscription(_, User, Server, JID, Type, Reason) ->
     process_subscription(in, User, Server, JID, Type, Reason).
 
@@ -374,7 +372,6 @@ process_subscription(Direction, User, Server, JID1, Type, Reason) ->
     LServer = jlib:nameprep(Server),
     US = {LUser, LServer},
     LJID = jlib:jid_tolower(JID1),
-    F = fun() ->
 		Item = case sdb_item({LUser, LServer, LJID}) of
 			   [] ->
 			       JID = {JID1#jid.user,
@@ -403,31 +400,27 @@ process_subscription(Direction, User, Server, JID1, Type, Reason) ->
 				    in_auto_reply(Item#roster.subscription,
 						  Item#roster.ask,
 						  Type)
-			    end,
+			  end,
 		AskMessage = case NewState of
 				 {_, both} -> Reason;
 				 {_, in}   -> Reason;
 				 _         -> ""
-			     end,
-		case NewState of
-		    none ->
-			{none, AutoReply};
-		    {none, none} when Item#roster.subscription == none,
+		   end,
+		{Push, AutoReply} = case NewState of
+		  none ->
+			  {none, AutoReply};
+		  {none, none} when Item#roster.subscription == none,
 		                      Item#roster.ask == in ->
-			sdb_remove({LUser, LServer, LJID}),
-			{none, AutoReply};
-		    {Subscription, Pending} ->
-			NewItem = Item#roster{subscription = Subscription,
+			  sdb_remove({LUser, LServer, LJID}),
+			  {none, AutoReply};
+		  {Subscription, Pending} ->
+			    NewItem = Item#roster{subscription = Subscription,
 					      ask = Pending,
 					      askmessage = list_to_binary(AskMessage)},
-			sdb_write(NewItem),
+			    sdb_write(NewItem),
 			{{push, NewItem}, AutoReply}
-		end
-	end,
-	%% will be removed
-    case mnesia:transaction(F) of
-	{atomic, {Push, AutoReply}} ->
-	    case AutoReply of
+		end,
+		case AutoReply of
 		none ->
 		    ok;
 		_ ->
@@ -452,10 +445,7 @@ process_subscription(Direction, User, Server, JID1, Type, Reason) ->
 		    true;
 		none ->
 		    false
-	    end;
-	_ ->
-	    false
-    end.
+	    end.
 
 %% in_state_change(Subscription, Pending, Type) -> NewState
 %% NewState = none | {NewSubscription, NewPending}
