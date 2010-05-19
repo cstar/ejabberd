@@ -76,10 +76,10 @@ foreach_user_msg(Bucket, {User, Host}, Fun)->
   
 get_all_msgs(US)->
   foreach_user_msg(bucket(), US, fun(_B, {_, Content, _})->
-      binary_to_term(list_to_binary(Content))
+      binary_to_term(Content)
     end).
 get_all_keys({User, Host})->
-  {ok, Keys} =  erls3:list_objects(bucket(), [{prefix, build_root(Host, User)}]),
+  {ok, Keys, _Common} =  erls3:list_objects(bucket(), [{prefix, build_root(Host, User)}]),
   lists:map(fun({object_info, {"Key", Key}, _, _, _}) -> Key end,Keys).
 
 start(Host, Opts) ->
@@ -317,7 +317,7 @@ pop_offline_messages(Ls, User, Server) ->
   %?DEBUG("foreach_user_msg(~p, ~p,fun(B,O)->{B, O} end) = ~p", 
   %    [bucket(), US, foreach_user_msg(bucket(), US,fun(B,O)->{B, O} end)]),
   Rs = foreach_user_msg(bucket(), US, fun(Bucket, {Key, Content, _})->
-    R = binary_to_term(list_to_binary(Content)),
+    R = binary_to_term(Content),
     ?DEBUG("found a message ~p:~n ~p", [Key, R]),
     TS = now(),
     NotExpired = case R#offline_msg.expire of
@@ -363,7 +363,7 @@ remove_expired_messages() ->
     TimeStamp = now(),
     Bucket = bucket(),
     erls3:get_objects(Bucket, [{prefix, ?S3_ROOT}],fun(_, {Key, Content, _})->
-      Rec = binary_to_term(list_to_binary(Content)),
+      Rec = binary_to_term(Content),
         case Rec#offline_msg.expire of
 			    never -> ok;
 			    TS ->
@@ -383,7 +383,7 @@ remove_old_messages(Days) ->
     Bucket = bucket(),
     TimeStamp = {MegaSecs1, Secs1, 0},
     erls3:get_objects(Bucket, [{prefix, ?S3_ROOT}],fun(_, {Key, Content, _})->
-      Rec = binary_to_term(list_to_binary(Content)),
+      Rec = binary_to_term(Content),
       TS = Rec#offline_msg.timestamp,
 			if
 			  TS < TimeStamp -> delete_msg(Bucket, Key);
